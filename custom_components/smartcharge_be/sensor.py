@@ -34,6 +34,7 @@ async def async_setup_entry(
             SmartChargeAvailableCurrentSensor(coordinator, entry),
             SmartChargeEaseeCurrentSensor(coordinator, entry),
             SmartChargeTargetCurrentSensor(coordinator, entry),
+            SmartChargePhaseCountSensor(coordinator, entry),
         ]
     )
 
@@ -213,5 +214,27 @@ class SmartChargeEaseeCurrentSensor(SmartChargeBaseSensor):
 
         if isinstance(value, (int, float)):
             return round(float(value), 1)
+class SmartChargePhaseCountSensor(SmartChargeBaseSensor):
+    """Show the number of charging phases."""
+
+    _attr_name = "Aantal laadfasen"
+    _attr_icon = "mdi:sine-wave"
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the phase-count sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_phase_count"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the number of charging phases."""
+        value: Any = self.coordinator.data.get("number_of_phases")
+
+        if isinstance(value, int):
+            return value
 
         return None
