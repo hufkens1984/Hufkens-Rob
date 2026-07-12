@@ -8,6 +8,8 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
+    CAR_BYD,
+    CAR_OMODA,
     MAX_CURRENT_BYD_ENTITY,
     MAX_CURRENT_OMODA_ENTITY,
     MAX_GRID_POWER_ENTITY,
@@ -18,6 +20,9 @@ from .const import (
 _LOGGER = logging.getLogger(__name__)
 
 _INVALID_STATES = {"unknown", "unavailable", ""}
+
+VOLTAGE_PER_PHASE = 230.0
+NUMBER_OF_PHASES = 3
 
 
 class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -59,15 +64,56 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return state.state
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Read the required Home Assistant entities."""
+        """Read entities and calculate available charging current."""
+        p1_power = self._read_number(P1_POWER_ENTITY)
+        selected_car = self._read_text(SELECTED_CAR_ENTITY)
+        max_grid_power = self._read_number(MAX_GRID_POWER_ENTITY)
+        max_current_omoda = self._read_number(
+            MAX_CURRENT_OMODA_ENTITY
+        )
+        max_current_byd = self._read_number(
+            MAX_CURRENT_BYD_ENTITY
+        )
+
+        selected_max_current: float | None = None
+
+        if selected_car == CAR_OMODA:
+            selected_max_current = max_current_omoda
+        elif selected_car == CAR_BYD:
+            selected_max_current = max_current_byd
+
+        available_power: float | None = None
+        available_current: float | None = None
+
+        if p1_power is not None and max_grid_power is not None:
+            available_power = max(
+                0.0,
+                max_grid_power - p1_power,
+            )
+
+            calculated_current = (
+                available_power
+                / VOLTAGE_PER_PHASE
+                / NUMBER_OF_PHASES
+            )
+
+            if selected_max_current is not None:
+                available_current = min(
+                    calculated_current,
+                    selected_max_current,
+                )
+            else:
+                available_current = calculated_current
+
+            available_current = max(0.0, available_current)
+
         return {
-            "p1_power": self._read_number(P1_POWER_ENTITY),
-            "selected_car": self._read_text(SELECTED_CAR_ENTITY),
-            "max_grid_power": self._read_number(MAX_GRID_POWER_ENTITY),
-            "max_current_omoda": self._read_number(
-                MAX_CURRENT_OMODA_ENTITY
-            ),
-            "max_current_byd": self._read_number(
-                MAX_CURRENT_BYD_ENTITY
-            ),
+            "p1_power": p1_power,
+            "selected_car": selected_car,
+            "max_grid_power": max_grid_power,
+            "max_current_omoda": max_current_omoda,
+            "max_current_byd": max_current_byd,
+            "selected_max_current": selected_max_current,
+            "available_power": available_power,
+            "available_current": available_current,
         }
