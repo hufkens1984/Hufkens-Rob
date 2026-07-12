@@ -195,7 +195,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 target_current = int(available_current)
 
             if target_current is not None:
-             await self._async_send_easee_limit(target_current)
+                await self._async_send_easee_limit(target_current)
 
         return {
             "p1_power": p1_power,
