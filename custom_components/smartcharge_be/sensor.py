@@ -31,6 +31,7 @@ async def async_setup_entry(
             SmartChargeStatusSensor(coordinator, entry),
             SmartChargeP1PowerSensor(coordinator, entry),
             SmartChargeSelectedCarSensor(coordinator, entry),
+            SmartChargeAvailableCurrentSensor(coordinator, entry),
         ]
     )
 
@@ -127,3 +128,26 @@ class SmartChargeSelectedCarSensor(SmartChargeBaseSensor):
             return value
 
         return None
+class SmartChargeAvailableCurrentSensor(SmartChargeBaseSensor):
+    """Show the available charging current."""
+
+    _attr_name = "Beschikbare laadstroom"
+    _attr_icon = "mdi:current-ac"
+    _attr_native_unit_of_measurement = "A"
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_available_current"
+
+    @property
+    def native_value(self) -> float | None:
+        value = self.coordinator.data.get("available_current")
+
+        if value is None:
+            return None
+
+        return round(value, 1)
