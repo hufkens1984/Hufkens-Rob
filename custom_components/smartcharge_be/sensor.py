@@ -1,5 +1,7 @@
 """Sensor platform for SmartCharge BE."""
 
+from typing import Any
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -7,11 +9,12 @@ from homeassistant.components.sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import UnitOfPower
-from homeassistant.core import Event, EventStateChangedData, HomeAssistant
+from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.helpers.event import async_track_state_change_event
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import P1_POWER_ENTITY
+from .const import DOMAIN
+from .coordinator import SmartChargeCoordinator
 
 
 async def async_setup_entry(
@@ -21,86 +24,79 @@ async def async_setup_entry(
 ) -> None:
     """Set up SmartCharge BE sensors."""
 
+    coordinator: SmartChargeCoordinator = hass.data[DOMAIN][entry.entry_id]
+
     async_add_entities(
         [
-            SmartChargeStatusSensor(entry),
-            SmartChargeP1PowerSensor(hass, entry),
+            SmartChargeStatusSensor(coordinator, entry),
+            SmartChargeP1PowerSensor(coordinator, entry),
         ]
     )
 
 
-class SmartChargeStatusSensor(SensorEntity):
+class SmartChargeBaseSensor(
+    CoordinatorEntity[SmartChargeCoordinator],
+    SensorEntity,
+):
+    """Base class for SmartCharge BE sensors."""
+
+    _attr_has_entity_name = True
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the base sensor."""
+        super().__init__(coordinator)
+        self._entry = entry
+
+
+class SmartChargeStatusSensor(SmartChargeBaseSensor):
     """Status sensor for SmartCharge BE."""
 
-    _attr_name = "SmartCharge BE status"
-    _attr_native_value = "Actief"
+    _attr_name = "Status"
     _attr_icon = "mdi:ev-station"
 
-    def __init__(self, entry: ConfigEntry) -> None:
-        """Initialize the sensor."""
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the status sensor."""
+        super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_status"
 
+    @property
+    def native_value(self) -> str:
+        """Return the integration status."""
+        return "Actief"
 
-class SmartChargeP1PowerSensor(SensorEntity):
+
+class SmartChargeP1PowerSensor(SmartChargeBaseSensor):
     """Show the current P1 meter power."""
 
-    _attr_name = "SmartCharge P1 vermogen"
+    _attr_name = "P1 vermogen"
     _attr_icon = "mdi:flash"
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = UnitOfPower.WATT
     _attr_state_class = SensorStateClass.MEASUREMENT
-    _attr_should_poll = False
 
     def __init__(
         self,
-        hass: HomeAssistant,
+        coordinator: SmartChargeCoordinator,
         entry: ConfigEntry,
     ) -> None:
-        """Initialize the sensor."""
-        self.hass = hass
+        """Initialize the P1 power sensor."""
+        super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_p1_power"
-        self._attr_native_value = None
-        self._remove_listener = None
 
-    async def async_added_to_hass(self) -> None:
-        """Start listening for P1 meter updates."""
-        await super().async_added_to_hass()
+    @property
+    def native_value(self) -> float | None:
+        """Return the current P1 power."""
+        value: Any = self.coordinator.data.get("p1_power")
 
-        self._update_from_source()
+        if isinstance(value, int | float):
+            return float(value)
 
-        self._remove_listener = async_track_state_change_event(
-            self.hass,
-            [P1_POWER_ENTITY],
-            self._handle_source_change,
-        )
-
-    async def async_will_remove_from_hass(self) -> None:
-        """Stop listening when the sensor is removed."""
-        if self._remove_listener is not None:
-            self._remove_listener()
-
-        await super().async_will_remove_from_hass()
-
-    def _handle_source_change(
-        self,
-        event: Event[EventStateChangedData],
-    ) -> None:
-        """Handle a change of the P1 source sensor."""
-        self._update_from_source()
-        self.async_write_ha_state()
-
-    def _update_from_source(self) -> None:
-        """Read the current P1 meter value."""
-        source_state = self.hass.states.get(P1_POWER_ENTITY)
-
-        if source_state is None or source_state.state in {
-            "unknown",
-            "unavailable",
-        }:
-            self._attr_native_value = None
-            return
-
-        try:
-            self._attr_native_value = float(source_state.state)
-        except ValueError:
-            self._attr_native_value = None
+        return None
