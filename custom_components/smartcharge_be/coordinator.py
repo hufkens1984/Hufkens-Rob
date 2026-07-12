@@ -31,7 +31,7 @@ EASEE_SERVICE = "set_charger_dynamic_limit"
 EASEE_DEVICE_ID = "e98abe937adc396a267e96c65f41e27f"
 
 # Veiligheid: eerst op False laten staan.
-ENABLE_EASEE_TEST = True
+ENABLE_EASEE_TEST = False
 EASEE_TEST_CURRENT = 6
 
 
