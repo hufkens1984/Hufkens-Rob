@@ -1,4 +1,5 @@
-__init__.py
-config_flow.py
-coordinator.py
-sensor.py
+"""Constants for SmartCharge BE."""
+
+DOMAIN = "smartcharge_be"
+NAME = "SmartCharge BE"
+VERSION = "0.0.1"
