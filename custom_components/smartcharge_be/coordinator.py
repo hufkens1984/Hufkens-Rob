@@ -5,7 +5,6 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
-from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
@@ -24,16 +23,7 @@ _LOGGER = logging.getLogger(__name__)
 _INVALID_STATES = {"unknown", "unavailable", ""}
 
 VOLTAGE_PER_PHASE = 230.0
-NUMBER_OF_PHASES = 3
 MINIMUM_CHARGING_CURRENT = 6.0
-
-EASEE_DOMAIN = "easee"
-EASEE_SERVICE = "set_charger_dynamic_limit"
-EASEE_DEVICE_ID = "e98abe937adc396a267e96c65f41e27f"
-
-# Veiligheid: eerst op False laten staan.
-ENABLE_EASEE_TEST = False
-EASEE_TEST_CURRENT = 6
 
 
 class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -48,7 +38,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             update_interval=timedelta(seconds=10),
         )
 
-        self._easee_test_sent = False
+        self._last_sent_current: int | None = None
 
     def _read_number(self, entity_id: str) -> float | None:
         """Read a numeric Home Assistant entity."""
@@ -76,47 +66,8 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return state.state
 
-    async def _async_send_easee_test_limit(self) -> None:
-        """Send a fixed Easee limit once for testing."""
-        if not ENABLE_EASEE_TEST or self._easee_test_sent:
-            return
-
-        if not self.hass.services.has_service(
-            EASEE_DOMAIN,
-            EASEE_SERVICE,
-        ):
-            _LOGGER.warning(
-                "Easee-service %s.%s is niet beschikbaar",
-                EASEE_DOMAIN,
-                EASEE_SERVICE,
-            )
-            return
-
-        try:
-            await self.hass.services.async_call(
-                EASEE_DOMAIN,
-                EASEE_SERVICE,
-                {
-                    "device_id": EASEE_DEVICE_ID,
-                    "current": EASEE_TEST_CURRENT,
-                },
-                blocking=True,
-            )
-        except HomeAssistantError:
-            _LOGGER.exception(
-                "Instellen van de Easee-testlimiet is mislukt"
-            )
-            return
-
-        self._easee_test_sent = True
-
-        _LOGGER.info(
-            "Easee-testlimiet ingesteld op %s A",
-            EASEE_TEST_CURRENT,
-        )
-
     async def _async_update_data(self) -> dict[str, Any]:
-        """Read entities and calculate charging values."""
+        """Read entities and calculate phase-aware charging values."""
         p1_power = self._read_number(P1_POWER_ENTITY)
         easee_current = self._read_number(EASEE_CURRENT_ENTITY)
         selected_car = self._read_text(SELECTED_CAR_ENTITY)
@@ -130,26 +81,50 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
 
         selected_max_current: float | None = None
+        number_of_phases: int | None = None
 
         if selected_car == CAR_OMODA:
             selected_max_current = max_current_omoda
+            number_of_phases = 1
+
         elif selected_car == CAR_BYD:
             selected_max_current = max_current_byd
+            number_of_phases = 3
 
-        available_power: float | None = None
+        current_charging_power: float | None = None
+        house_power_without_charger: float | None = None
+        allowed_charging_power: float | None = None
         available_current: float | None = None
         target_current: int | None = None
 
-        if p1_power is not None and max_grid_power is not None:
-            available_power = max(
+        if (
+            p1_power is not None
+            and easee_current is not None
+            and max_grid_power is not None
+            and number_of_phases is not None
+        ):
+            # Geschat huidig vermogen van de laadpaal.
+            current_charging_power = (
+                easee_current
+                * VOLTAGE_PER_PHASE
+                * number_of_phases
+            )
+
+            # Het P1-vermogen bevat ook de laadpaal.
+            house_power_without_charger = (
+                p1_power - current_charging_power
+            )
+
+            # Vermogen dat maximaal beschikbaar is voor de laadpaal.
+            allowed_charging_power = max(
                 0.0,
-                max_grid_power - p1_power,
+                max_grid_power - house_power_without_charger,
             )
 
             calculated_current = (
-                available_power
+                allowed_charging_power
                 / VOLTAGE_PER_PHASE
-                / NUMBER_OF_PHASES
+                / number_of_phases
             )
 
             if selected_max_current is not None:
@@ -170,19 +145,19 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 target_current = int(available_current)
 
-        await self._async_send_easee_test_limit()
-
         return {
             "p1_power": p1_power,
             "easee_current": easee_current,
             "selected_car": selected_car,
+            "number_of_phases": number_of_phases,
             "max_grid_power": max_grid_power,
             "max_current_omoda": max_current_omoda,
             "max_current_byd": max_current_byd,
             "selected_max_current": selected_max_current,
-            "available_power": available_power,
+            "current_charging_power": current_charging_power,
+            "house_power_without_charger": house_power_without_charger,
+            "allowed_charging_power": allowed_charging_power,
             "available_current": available_current,
             "target_current": target_current,
-            "easee_test_enabled": ENABLE_EASEE_TEST,
-            "easee_test_sent": self._easee_test_sent,
+            "last_sent_current": self._last_sent_current,
         }
