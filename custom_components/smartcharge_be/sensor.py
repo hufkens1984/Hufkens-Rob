@@ -32,6 +32,7 @@ async def async_setup_entry(
             SmartChargeP1PowerSensor(coordinator, entry),
             SmartChargeSelectedCarSensor(coordinator, entry),
             SmartChargeAvailableCurrentSensor(coordinator, entry),
+            SmartChargeEaseeCurrentSensor(coordinator, entry),
             SmartChargeTargetCurrentSensor(coordinator, entry),
         ]
     )
@@ -185,5 +186,32 @@ class SmartChargeTargetCurrentSensor(SmartChargeBaseSensor):
 
         if isinstance(value, (int, float)):
             return int(value)
+
+        return None
+class SmartChargeEaseeCurrentSensor(SmartChargeBaseSensor):
+    """Show the current Easee charging current."""
+
+    _attr_name = "Easee laadstroom"
+    _attr_icon = "mdi:ev-plug-type2"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the Easee-current sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_easee_current"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return the current Easee charging current."""
+        value: Any = self.coordinator.data.get("easee_current")
+
+        if isinstance(value, (int, float)):
+            return round(float(value), 1)
 
         return None
