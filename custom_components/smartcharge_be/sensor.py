@@ -36,6 +36,7 @@ async def async_setup_entry(
             SmartChargeTargetCurrentSensor(coordinator, entry),
             SmartChargePhaseCountSensor(coordinator, entry),
             SmartChargeHousePowerSensor(coordinator, entry),
+            SmartChargeLastSentCurrentSensor(coordinator, entry),
         ]
     )
 
@@ -163,33 +164,6 @@ class SmartChargeAvailableCurrentSensor(SmartChargeBaseSensor):
         return None
 
 
-class SmartChargeTargetCurrentSensor(SmartChargeBaseSensor):
-    """Show the target charging current."""
-
-    _attr_name = "Doel laadstroom"
-    _attr_icon = "mdi:ev-plug-type2"
-    _attr_device_class = SensorDeviceClass.CURRENT
-    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
-    _attr_state_class = SensorStateClass.MEASUREMENT
-
-    def __init__(
-        self,
-        coordinator: SmartChargeCoordinator,
-        entry: ConfigEntry,
-    ) -> None:
-        """Initialize the target-current sensor."""
-        super().__init__(coordinator, entry)
-        self._attr_unique_id = f"{entry.entry_id}_target_current"
-
-    @property
-    def native_value(self) -> int | None:
-        """Return the target charging current."""
-        value: Any = self.coordinator.data.get("target_current")
-
-        if isinstance(value, (int, float)):
-            return int(value)
-
-        return None
 class SmartChargeEaseeCurrentSensor(SmartChargeBaseSensor):
     """Show the current Easee charging current."""
 
@@ -215,6 +189,39 @@ class SmartChargeEaseeCurrentSensor(SmartChargeBaseSensor):
 
         if isinstance(value, (int, float)):
             return round(float(value), 1)
+
+        return None
+
+
+class SmartChargeTargetCurrentSensor(SmartChargeBaseSensor):
+    """Show the target charging current."""
+
+    _attr_name = "Doel laadstroom"
+    _attr_icon = "mdi:target"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the target-current sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_target_current"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the target charging current."""
+        value: Any = self.coordinator.data.get("target_current")
+
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        return None
+
+
 class SmartChargePhaseCountSensor(SmartChargeBaseSensor):
     """Show the number of charging phases."""
 
@@ -239,6 +246,8 @@ class SmartChargePhaseCountSensor(SmartChargeBaseSensor):
             return value
 
         return None
+
+
 class SmartChargeHousePowerSensor(SmartChargeBaseSensor):
     """Show house power without the EV charger."""
 
@@ -255,7 +264,9 @@ class SmartChargeHousePowerSensor(SmartChargeBaseSensor):
     ) -> None:
         """Initialize the house-power sensor."""
         super().__init__(coordinator, entry)
-        self._attr_unique_id = f"{entry.entry_id}_house_power_without_charger"
+        self._attr_unique_id = (
+            f"{entry.entry_id}_house_power_without_charger"
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -266,5 +277,34 @@ class SmartChargeHousePowerSensor(SmartChargeBaseSensor):
 
         if isinstance(value, (int, float)):
             return round(float(value), 0)
+
+        return None
+
+
+class SmartChargeLastSentCurrentSensor(SmartChargeBaseSensor):
+    """Show the last charging current sent to Easee."""
+
+    _attr_name = "Laatst ingestelde laadstroom"
+    _attr_icon = "mdi:transmission-tower-export"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the last-sent-current sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_last_sent_current"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the last current successfully sent to Easee."""
+        value: Any = self.coordinator.data.get("last_sent_current")
+
+        if isinstance(value, (int, float)):
+            return int(value)
 
         return None

@@ -5,6 +5,7 @@ import logging
 from typing import Any
 
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
@@ -24,6 +25,13 @@ _INVALID_STATES = {"unknown", "unavailable", ""}
 
 VOLTAGE_PER_PHASE = 230.0
 MINIMUM_CHARGING_CURRENT = 6.0
+
+EASEE_DOMAIN = "easee"
+EASEE_SERVICE = "set_charger_dynamic_limit"
+EASEE_DEVICE_ID = "e98abe937adc396a267e96c65f41e27f"
+
+# Automatische aansturing blijft voorlopig uit.
+AUTO_CONTROL_ENABLED = False
 
 
 class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -58,13 +66,61 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return None
 
     def _read_text(self, entity_id: str) -> str | None:
-        """Read a text-based Home Assistant entity."""
+        """Read a text Home Assistant entity."""
         state = self.hass.states.get(entity_id)
 
         if state is None or state.state in _INVALID_STATES:
             return None
 
         return state.state
+
+    async def _async_send_easee_limit(
+        self,
+        target_current: int,
+    ) -> bool:
+        """Send a dynamic charging limit to Easee."""
+        if not AUTO_CONTROL_ENABLED:
+            return False
+
+        if self._last_sent_current == target_current:
+            return False
+
+        if not self.hass.services.has_service(
+            EASEE_DOMAIN,
+            EASEE_SERVICE,
+        ):
+            _LOGGER.warning(
+                "Easee-service %s.%s is niet beschikbaar",
+                EASEE_DOMAIN,
+                EASEE_SERVICE,
+            )
+            return False
+
+        try:
+            await self.hass.services.async_call(
+                EASEE_DOMAIN,
+                EASEE_SERVICE,
+                {
+                    "device_id": EASEE_DEVICE_ID,
+                    "current": target_current,
+                },
+                blocking=True,
+            )
+        except HomeAssistantError:
+            _LOGGER.exception(
+                "Instellen van Easee-laadstroom op %s A is mislukt",
+                target_current,
+            )
+            return False
+
+        self._last_sent_current = target_current
+
+        _LOGGER.info(
+            "Easee dynamische laadlimiet ingesteld op %s A",
+            target_current,
+        )
+
+        return True
 
     async def _async_update_data(self) -> dict[str, Any]:
         """Read entities and calculate phase-aware charging values."""
@@ -86,7 +142,6 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if selected_car == CAR_OMODA:
             selected_max_current = max_current_omoda
             number_of_phases = 1
-
         elif selected_car == CAR_BYD:
             selected_max_current = max_current_byd
             number_of_phases = 3
@@ -103,19 +158,16 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             and max_grid_power is not None
             and number_of_phases is not None
         ):
-            # Geschat huidig vermogen van de laadpaal.
             current_charging_power = (
                 easee_current
                 * VOLTAGE_PER_PHASE
                 * number_of_phases
             )
 
-            # Het P1-vermogen bevat ook de laadpaal.
             house_power_without_charger = (
                 p1_power - current_charging_power
             )
 
-            # Vermogen dat maximaal beschikbaar is voor de laadpaal.
             allowed_charging_power = max(
                 0.0,
                 max_grid_power - house_power_without_charger,
@@ -135,15 +187,15 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 available_current = calculated_current
 
-            available_current = max(
-                0.0,
-                available_current,
-            )
+            available_current = max(0.0, available_current)
 
             if available_current < MINIMUM_CHARGING_CURRENT:
                 target_current = 0
             else:
                 target_current = int(available_current)
+
+            if target_current is not None:
+             await self._async_send_easee_limit(target_current)
 
         return {
             "p1_power": p1_power,
