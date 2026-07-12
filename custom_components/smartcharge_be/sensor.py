@@ -30,6 +30,7 @@ async def async_setup_entry(
         [
             SmartChargeStatusSensor(coordinator, entry),
             SmartChargeP1PowerSensor(coordinator, entry),
+            SmartChargeSelectedCarSensor(coordinator, entry),
         ]
     )
 
@@ -96,7 +97,33 @@ class SmartChargeP1PowerSensor(SmartChargeBaseSensor):
         """Return the current P1 power."""
         value: Any = self.coordinator.data.get("p1_power")
 
-        if isinstance(value, int | float):
+        if isinstance(value, (int, float)):
             return float(value)
+
+        return None
+
+
+class SmartChargeSelectedCarSensor(SmartChargeBaseSensor):
+    """Show the selected car."""
+
+    _attr_name = "Geselecteerde auto"
+    _attr_icon = "mdi:car-electric"
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the selected-car sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_selected_car"
+
+    @property
+    def native_value(self) -> str | None:
+        """Return the selected car."""
+        value: Any = self.coordinator.data.get("selected_car")
+
+        if isinstance(value, str):
+            return value
 
         return None
