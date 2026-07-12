@@ -1,0 +1,9 @@
+DOMAIN = "smartcharge_be"
+
+CONF_MAX_POWER = "max_power"
+CONF_BUFFER = "buffer"
+
+DEFAULT_MAX_POWER = 6000
+DEFAULT_BUFFER = 300
+
+SCAN_INTERVAL = 2
