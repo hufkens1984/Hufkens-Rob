@@ -7,8 +7,11 @@ from .const import DOMAIN, PLATFORMS
 from .coordinator import SmartChargeCoordinator
 
 
-async def async_setup(hass: HomeAssistant, config: dict) -> bool:
-    """Set up SmartCharge BE via YAML."""
+async def async_setup(
+    hass: HomeAssistant,
+    config: dict,
+) -> bool:
+    """Set up SmartCharge BE through YAML."""
     return True
 
 
@@ -19,6 +22,7 @@ async def async_setup_entry(
     """Set up SmartCharge BE from a config entry."""
 
     coordinator = SmartChargeCoordinator(hass)
+
     await coordinator.async_config_entry_first_refresh()
 
     hass.data.setdefault(DOMAIN, {})
@@ -38,9 +42,15 @@ async def async_unload_entry(
 ) -> bool:
     """Unload SmartCharge BE."""
 
-    hass.data[DOMAIN].pop(entry.entry_id)
-
-    return await hass.config_entries.async_unload_platforms(
+    unload_ok = await hass.config_entries.async_unload_platforms(
         entry,
         PLATFORMS,
     )
+
+    if unload_ok:
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+
+        if not hass.data[DOMAIN]:
+            hass.data.pop(DOMAIN, None)
+
+    return unload_ok

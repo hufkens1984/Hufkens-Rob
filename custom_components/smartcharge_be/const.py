@@ -6,6 +6,7 @@ PLATFORMS = ["sensor"]
 
 P1_POWER_ENTITY = "sensor.p1_meter_vermogen"
 EASEE_CURRENT_ENTITY = "sensor.emdxarvh_stroom"
+
 SELECTED_CAR_ENTITY = "input_select.geselecteerde_auto"
 MAX_GRID_POWER_ENTITY = "input_number.maximaal_netverbruik_laden"
 MAX_CURRENT_OMODA_ENTITY = "input_number.max_laadstroom_omoda"
