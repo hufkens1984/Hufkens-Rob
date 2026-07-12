@@ -23,6 +23,7 @@ _INVALID_STATES = {"unknown", "unavailable", ""}
 
 VOLTAGE_PER_PHASE = 230.0
 NUMBER_OF_PHASES = 3
+MINIMUM_CHARGING_CURRENT = 6.0
 
 
 class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
@@ -64,7 +65,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return state.state
 
     async def _async_update_data(self) -> dict[str, Any]:
-        """Read entities and calculate available charging current."""
+        """Read entities and calculate charging values."""
         p1_power = self._read_number(P1_POWER_ENTITY)
         selected_car = self._read_text(SELECTED_CAR_ENTITY)
         max_grid_power = self._read_number(MAX_GRID_POWER_ENTITY)
@@ -84,6 +85,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         available_power: float | None = None
         available_current: float | None = None
+        target_current: int | None = None
 
         if p1_power is not None and max_grid_power is not None:
             available_power = max(
@@ -105,7 +107,15 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             else:
                 available_current = calculated_current
 
-            available_current = max(0.0, available_current)
+            available_current = max(
+                0.0,
+                available_current,
+            )
+
+            if available_current < MINIMUM_CHARGING_CURRENT:
+                target_current = 0
+            else:
+                target_current = int(available_current)
 
         return {
             "p1_power": p1_power,
@@ -116,4 +126,5 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             "selected_max_current": selected_max_current,
             "available_power": available_power,
             "available_current": available_current,
+            "target_current": target_current,
         }

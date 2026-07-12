@@ -8,7 +8,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import UnitOfPower
+from homeassistant.const import UnitOfElectricCurrent, UnitOfPower
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
@@ -32,6 +32,7 @@ async def async_setup_entry(
             SmartChargeP1PowerSensor(coordinator, entry),
             SmartChargeSelectedCarSensor(coordinator, entry),
             SmartChargeAvailableCurrentSensor(coordinator, entry),
+            SmartChargeTargetCurrentSensor(coordinator, entry),
         ]
     )
 
@@ -128,26 +129,61 @@ class SmartChargeSelectedCarSensor(SmartChargeBaseSensor):
             return value
 
         return None
+
+
 class SmartChargeAvailableCurrentSensor(SmartChargeBaseSensor):
     """Show the available charging current."""
 
     _attr_name = "Beschikbare laadstroom"
     _attr_icon = "mdi:current-ac"
-    _attr_native_unit_of_measurement = "A"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(
         self,
         coordinator: SmartChargeCoordinator,
         entry: ConfigEntry,
     ) -> None:
+        """Initialize the available-current sensor."""
         super().__init__(coordinator, entry)
         self._attr_unique_id = f"{entry.entry_id}_available_current"
 
     @property
     def native_value(self) -> float | None:
-        value = self.coordinator.data.get("available_current")
+        """Return the available charging current."""
+        value: Any = self.coordinator.data.get("available_current")
 
-        if value is None:
-            return None
+        if isinstance(value, (int, float)):
+            return round(float(value), 1)
 
-        return round(value, 1)
+        return None
+
+
+class SmartChargeTargetCurrentSensor(SmartChargeBaseSensor):
+    """Show the target charging current."""
+
+    _attr_name = "Doel laadstroom"
+    _attr_icon = "mdi:ev-plug-type2"
+    _attr_device_class = SensorDeviceClass.CURRENT
+    _attr_native_unit_of_measurement = UnitOfElectricCurrent.AMPERE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the target-current sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_target_current"
+
+    @property
+    def native_value(self) -> int | None:
+        """Return the target charging current."""
+        value: Any = self.coordinator.data.get("target_current")
+
+        if isinstance(value, (int, float)):
+            return int(value)
+
+        return None
