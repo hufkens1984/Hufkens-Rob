@@ -35,6 +35,7 @@ async def async_setup_entry(
             SmartChargeEaseeCurrentSensor(coordinator, entry),
             SmartChargeTargetCurrentSensor(coordinator, entry),
             SmartChargePhaseCountSensor(coordinator, entry),
+            SmartChargeHousePowerSensor(coordinator, entry),
         ]
     )
 
@@ -236,5 +237,34 @@ class SmartChargePhaseCountSensor(SmartChargeBaseSensor):
 
         if isinstance(value, int):
             return value
+
+        return None
+class SmartChargeHousePowerSensor(SmartChargeBaseSensor):
+    """Show house power without the EV charger."""
+
+    _attr_name = "Huisvermogen zonder laadpaal"
+    _attr_icon = "mdi:home-lightning-bolt"
+    _attr_device_class = SensorDeviceClass.POWER
+    _attr_native_unit_of_measurement = UnitOfPower.WATT
+    _attr_state_class = SensorStateClass.MEASUREMENT
+
+    def __init__(
+        self,
+        coordinator: SmartChargeCoordinator,
+        entry: ConfigEntry,
+    ) -> None:
+        """Initialize the house-power sensor."""
+        super().__init__(coordinator, entry)
+        self._attr_unique_id = f"{entry.entry_id}_house_power_without_charger"
+
+    @property
+    def native_value(self) -> float | None:
+        """Return house power excluding the charger."""
+        value: Any = self.coordinator.data.get(
+            "house_power_without_charger"
+        )
+
+        if isinstance(value, (int, float)):
+            return round(float(value), 0)
 
         return None
