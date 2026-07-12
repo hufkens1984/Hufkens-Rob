@@ -32,7 +32,7 @@ EASEE_SERVICE = "set_charger_dynamic_limit"
 EASEE_DEVICE_ID = "e98abe937adc396a267e96c65f41e27f"
 
 # Veiligheidsinstelling: automatische aansturing blijft voorlopig uit.
-AUTO_CONTROL_ENABLED = False
+AUTO_CONTROL_ENABLED = True
 
 
 class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
