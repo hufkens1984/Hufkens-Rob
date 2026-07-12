@@ -11,6 +11,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 from .const import (
     CAR_BYD,
     CAR_OMODA,
+    EASEE_CURRENT_ENTITY,
     MAX_CURRENT_BYD_ENTITY,
     MAX_CURRENT_OMODA_ENTITY,
     MAX_GRID_POWER_ENTITY,
@@ -117,6 +118,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         """Read entities and calculate charging values."""
         p1_power = self._read_number(P1_POWER_ENTITY)
+        easee_current = self._read_number(EASEE_CURRENT_ENTITY)
         selected_car = self._read_text(SELECTED_CAR_ENTITY)
         max_grid_power = self._read_number(MAX_GRID_POWER_ENTITY)
 
@@ -172,6 +174,7 @@ class SmartChargeCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
         return {
             "p1_power": p1_power,
+            "easee_current": easee_current,
             "selected_car": selected_car,
             "max_grid_power": max_grid_power,
             "max_current_omoda": max_current_omoda,
