@@ -1,0 +1,13 @@
+{
+  "domain": "smartcharge_be",
+  "name": "SmartCharge BE",
+  "version": "0.1.0",
+  "documentation": "https://github.com/",
+  "requirements": [],
+  "dependencies": [],
+  "codeowners": [
+    "@SmartCharge-Hufkens"
+  ],
+  "config_flow": true,
+  "iot_class": "local_polling"
+}
